@@ -6,17 +6,19 @@ Defines scripts.
 """
 
 import argparse
+import os
 import sys
 from lepton import Stream
 
 def _parse_args():
     parser = argparse.ArgumentParser()
+    default_dev_idx = int(os.getenv('LEPTON_DEVICE_INDEX', '0'))
     parser.add_argument(
         '-id',
         '--dev_index',
-        help = "Lepton camera device index. Default is 0.",
+        help = "Lepton camera device index. Can also be set via LEPTON_DEVICE_INDEX env var. Default is 0.",
         type = int,
-        default = 0,
+        default = default_dev_idx,
     )
     parser.add_argument(
         '-r',

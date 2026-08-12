@@ -59,6 +59,22 @@ leprun
 
 When you are finshed streaming, press the `esc` while the viewer window is active to terminate.
 
+#### Device Index
+
+PureThermal boards typically enumerate multiple camera entries in Windows. If you receive a `ShapeException` error, the device index may be pointing to the wrong camera interface. Try specifying a different device index:
+
+```powershell
+leprun -id 1
+leprun -id 2
+```
+
+You can also set a default device index using the `LEPTON_DEVICE_INDEX` environment variable:
+
+```powershell
+$env:LEPTON_DEVICE_INDEX = 1
+leprun
+```
+
 ### Recording
 
 To record a stream, use the `-r` flag.
