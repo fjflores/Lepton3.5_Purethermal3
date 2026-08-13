@@ -4,3 +4,4 @@ dist/
 lepton_pt.egg-info/
 build/
 CLAUDE.md
+.vscode/
