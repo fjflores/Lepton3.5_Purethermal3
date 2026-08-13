@@ -87,6 +87,17 @@ All generated data is saved to the directory `Lepton_Recordings` which itself is
 
 When you are finshed recording, press the `esc` while the viewing window is active to terminate. After termination, a background process will render the video. This may take several minutes depending on the length of the recording.
 
+### Raw Snapshots
+
+To periodically save the raw uint16 radiometric frame as a 16-bit TIFF, use the `-sr` flag with an interval in minutes. It works with or without `-r`.
+
+```powershell
+leprun -sr 5
+leprun -r -sr 5
+```
+
+The first valid frame is saved immediately and then one frame every interval. Images are named `Lepton_Capture_<idx>.tiff` and saved to a `YYYY-MM-DD_HH-MM-SS_Thermal` directory inside the save path. Pixel values are the camera's native centikelvin counts, before dead-pixel repair and before any homography warp.
+
 ### Other
 
 You can use the `-h` flag to explore addtional flags and functionality.

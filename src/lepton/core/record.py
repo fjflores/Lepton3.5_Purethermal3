@@ -166,6 +166,56 @@ class FrameWriter:
         os.remove(self._dirpath.with_suffix(".zip"))
         self._archive = None
 
+class RawFrameWriter:
+    """
+    Periodically saves the true raw uint16 sensor frame (centikelvin, before denoising and
+    homography) as a 16-bit TIFF during camera stream.
+
+    Parameters
+    ----------
+    dirpath : string
+        The path to the directory in which the snapshot directory is made.
+    interval : float > 0
+        The time between saved snapshots in minutes.
+
+    """
+    def __init__(self, dirpath, interval):
+        if not interval > 0.0:
+            raise ValueError(f"interval must be a positive number of minutes, got {interval}")
+        parentpath = Path(dirpath)
+        fname = Path(datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_Thermal")
+        self._dirpath = parentpath / fname
+        self._interval = 60000.0 * float(interval)
+        self._next_time = 0.0
+        self._count = 0
+
+    def add(self, raw_data, time):
+        """
+        Saves a raw frame snapshot if the frame time has reached the next scheduled snapshot
+        time. The first valid frame is always saved.
+
+        Parameters
+        ----------
+        raw_data: ndarray
+            The uint16 ndarray of raw frame data. The last 2 telemetry rows are excluded from
+            the saved image.
+        time: int
+            The frame time in ms, offset from the first frame of the stream.
+
+        Returns
+        -------
+        None.
+
+        """
+        if time < self._next_time:
+            return
+        while self._next_time <= time:
+            self._next_time += self._interval
+        self._dirpath.mkdir(parents=True, exist_ok=True)
+        fname = f"Lepton_Capture_{self._count:04d}.tiff"
+        cv2.imwrite(str(self._dirpath / fname), raw_data[:-2])
+        self._count += 1
+
 def _render_frame(frame):
     return cv2.cvtColor(ViewerImage(*frame).asuint8(), cv2.COLOR_BGR2RGB)
 

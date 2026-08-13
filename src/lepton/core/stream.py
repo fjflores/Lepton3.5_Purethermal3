@@ -14,7 +14,7 @@ import traceback
 import sys
 from lepton.misc import colormaps, detect_fp_fronts
 from lepton.exceptions import CaptureException, CaptureTimeout, ShapeException, UnknownCmapException
-from . import Capture, Viewer, ViewerImage, FrameWriter
+from . import Capture, Viewer, ViewerImage, FrameWriter, RawFrameWriter
 
 @dataclass()
 class StreamBuffer:
@@ -121,6 +121,11 @@ class Stream:
         dirpath: string
             The path to the directory in which the recording data is saved. The default is
             'Lepton_Recordings'
+        save_raw: float > 0
+            When given, the true raw uint16 sensor frame (centikelvin, before denoising and
+            homography) is saved as a 16-bit TIFF every save_raw minutes, starting with the
+            first valid frame. Snapshots are saved to a '<timestamp>_Thermal' directory inside
+            the save path. Works with or without recording. The default is None (no snapshots).
 
         Returns
         -------
@@ -209,6 +214,9 @@ class Stream:
             self._bufs['temperature'].append(frame.temperature)
             self._bufs['telemetry'].append(frame.telemetry)
 
+            if opts["raw_writer"] is not None:
+                opts["raw_writer"].add(frame.raw_data, self._bufs['time'][-1])
+
             if opts["detect"]:
                 i_range = range(max(-len(self._bufs['temperature']), -3), 0)
                 mask = detect_fp_fronts([self._bufs['temperature'][i] for i in i_range])
@@ -259,7 +267,12 @@ class Stream:
                 "cmap": colormaps[kwargs.get("cmap", "magma")],
                 "scale": 4.0*max(min(kwargs.get("scale", 1.0), 2.0), 0.25),
                 "dirpath": kwargs.get("save_path", "Lepton_Recordings"),
+                "save_raw": kwargs.get("save_raw", None),
             }
+            if opts["save_raw"] is not None:
+                opts["raw_writer"] = RawFrameWriter(opts["dirpath"], opts["save_raw"])
+            else:
+                opts["raw_writer"] = None
             with(
                 Capture(self._params["dev_idx"]) as cap,
                 Viewer(self._params["window"], opts["scale"]) as viewer,
@@ -307,6 +320,11 @@ class Stream:
         dirpath: string
             The path to the directory in which the recording data is saved. The default is
             'Lepton_Recordings'
+        save_raw: float > 0
+            When given, the true raw uint16 sensor frame (centikelvin, before denoising and
+            homography) is saved as a 16-bit TIFF every save_raw minutes, starting with the
+            first valid frame. Snapshots are saved to a '<timestamp>_Thermal' directory inside
+            the save path. Works with or without recording. The default is None (no snapshots).
 
         Returns
         -------

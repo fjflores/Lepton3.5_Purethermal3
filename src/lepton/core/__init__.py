@@ -7,7 +7,7 @@ Subpackage: core initialization.
 
 from .capture import CapFrame, Capture
 from .interface import Homography, Viewer, ViewerImage
-from .record import FrameWriter, makevideo
+from .record import FrameWriter, RawFrameWriter, makevideo
 from .stream import StreamBuffer
 
 __all__ = [
@@ -18,5 +18,6 @@ __all__ = [
     "ViewerImage",
     "StreamBuffer",
     "FrameWriter",
+    "RawFrameWriter",
     "makevideo",
 ]

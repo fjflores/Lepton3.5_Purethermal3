@@ -10,6 +10,16 @@ import os
 import sys
 from lepton import Stream
 
+def _positive_float(val):
+    try:
+        fval = float(val)
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(f"invalid float value: '{val}'") from e
+    if fval <= 0.0:
+        raise argparse.ArgumentTypeError(f"interval must be positive, got {val}")
+    return fval
+
+
 def _parse_args():
     parser = argparse.ArgumentParser()
     default_dev_idx = int(os.getenv('LEPTON_DEVICE_INDEX', '0'))
@@ -33,6 +43,14 @@ def _parse_args():
         help = "Path to the save dir. Default is Lepton_Recordings.",
         type = str,
         default = "Lepton_Recordings",
+    )
+    parser.add_argument(
+        '-sr',
+        "--save_raw",
+        help = "Interval in minutes between raw uint16 TIFF snapshots (pre-denoise, "
+               "pre-homography), saved under the save path. Default is off.",
+        type = _positive_float,
+        default = None,
     )
     parser.add_argument(
         '-c',
@@ -84,6 +102,7 @@ def leprun(args = None):
         cmap = args.cmap,
         scale = args.viewer_scale,
         save_path = args.save_path,
+        save_raw = args.save_raw,
     )
 
 if __name__ == "__main__":
