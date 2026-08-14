@@ -33,6 +33,9 @@ class FrameWriter:
         The path to the directory in which the frame archive is made.
     cmap : matplotlib.colors.ListedColormap
         The colormap used to colorize the image.
+    temp_range : tuple (min_C, max_C), optional
+        Fixed temperature range mapped across the colormap in the rendered video. When None,
+        each frame is autoscaled to its own min/max. The default is None.
 
     Attributes
     ----------
@@ -40,13 +43,14 @@ class FrameWriter:
         The coordinates of the corners of the ROI defined in viewer window coordinates.
 
     """
-    def __init__(self, dirpath, cmap):
+    def __init__(self, dirpath, cmap, temp_range = None):
         parentpath = Path(dirpath)
         parentpath.mkdir(parents=True, exist_ok=True)
         fname = Path(datetime.now().strftime("%Y-%m-%d_%H%M%S"))
         self._dirpath = parentpath / fname
         self._archive = None
         self._cmap = cmap
+        self._temp_range = temp_range
         self._archive_fnames = deque([])
 
     def __enter__(self):
@@ -89,7 +93,8 @@ class FrameWriter:
             frames["telemetry"],
             frames["mask"],
             self._cmap,
-            self._dirpath / ("video.mp4")
+            self._dirpath / ("video.mp4"),
+            temp_range = self._temp_range
         )
         for k, v in frames.items():
             if k == "telemetry":
@@ -264,7 +269,7 @@ def _write_loop(frames, path):
     finally:
         out.release()
 
-def makevideo(temperature, telemetry, mask, cmap, path):
+def makevideo(temperature, telemetry, mask, cmap, path, temp_range = None):
     """
     Renders and saves a recording.
 
@@ -280,6 +285,9 @@ def makevideo(temperature, telemetry, mask, cmap, path):
         The colormap used to colorize the frames.
     path: pathlib.Path
         The path of the video.
+    temp_range : tuple (min_C, max_C), optional
+        Fixed temperature range mapped across the colormap. When None, each frame is
+        autoscaled to its own min/max. The default is None.
 
     Returns
     -------
@@ -293,6 +301,7 @@ def makevideo(temperature, telemetry, mask, cmap, path):
         "scale" : 4.0,
         "cmap" : cmap,
         "record" : False,
+        "temp_range" : temp_range,
     }
     frames = [(temp, telem, m, t0, opts) for (temp, telem, m) in zip(temperature, telemetry, mask)]
     thread = Thread(target=_write_loop, args=(frames, path, ))

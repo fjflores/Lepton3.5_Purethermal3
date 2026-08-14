@@ -128,6 +128,11 @@ class Stream:
             appended to a Temperature_Stats.csv file, one row per snapshot. Snapshots are
             saved to a '<timestamp>_Thermal' directory inside the save path. Works with or
             without recording. The default is None (no snapshots).
+        temp_range: tuple (min_C, max_C)
+            When given, the viewer (and any recorded video) maps this fixed temperature range
+            across the colormap instead of autoscaling each frame to its own min/max. Only
+            affects visualization; recorded temperature data and raw snapshots are unchanged.
+            The default is None (autoscale).
 
         Returns
         -------
@@ -190,8 +195,8 @@ class Stream:
         time.sleep(0.05)
         return None
 
-    def _record_loop(self, dirpath, cmap):
-        with FrameWriter(dirpath, cmap) as writer:
+    def _record_loop(self, dirpath, cmap, temp_range):
+        with FrameWriter(dirpath, cmap, temp_range) as writer:
             while not self._done() or not self._bufs_empty():
                 data = self._bufs_popleft(1 if self._done() else 8)
                 writer.add(data)
@@ -270,7 +275,14 @@ class Stream:
                 "scale": 4.0*max(min(kwargs.get("scale", 1.0), 2.0), 0.25),
                 "dirpath": kwargs.get("save_path", "Lepton_Recordings"),
                 "save_raw": kwargs.get("save_raw", None),
+                "temp_range": kwargs.get("temp_range", None),
             }
+            if opts["temp_range"] is not None:
+                opts["temp_range"] = (float(opts["temp_range"][0]), float(opts["temp_range"][1]))
+                if not opts["temp_range"][0] < opts["temp_range"][1]:
+                    raise ValueError(
+                        f"temp_range min must be less than max, got {opts['temp_range']}"
+                    )
             if opts["save_raw"] is not None:
                 opts["raw_writer"] = RawFrameWriter(opts["dirpath"], opts["save_raw"])
             else:
@@ -284,7 +296,7 @@ class Stream:
                 if opts["record"]:
                     _record_thread = Thread(
                         target=self._record_loop,
-                        args=(opts["dirpath"], opts["cmap"], )
+                        args=(opts["dirpath"], opts["cmap"], opts["temp_range"], )
                     )
                     _record_thread.start()
                 self._stream_loop(cap, viewer, opts)
@@ -329,6 +341,11 @@ class Stream:
             appended to a Temperature_Stats.csv file, one row per snapshot. Snapshots are
             saved to a '<timestamp>_Thermal' directory inside the save path. Works with or
             without recording. The default is None (no snapshots).
+        temp_range: tuple (min_C, max_C)
+            When given, the viewer (and any recorded video) maps this fixed temperature range
+            across the colormap instead of autoscaling each frame to its own min/max. Only
+            affects visualization; recorded temperature data and raw snapshots are unchanged.
+            The default is None (autoscale).
 
         Returns
         -------

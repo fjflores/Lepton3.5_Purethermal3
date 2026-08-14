@@ -383,12 +383,15 @@ class ViewerImage:
         "scale": float > 1: The scale of the viewer window. Used to properly size the image.
         "cmap": matplotlib.colors.ListedColormap: The colormap used to colorize the image.
         "record": bool: When True, adds a recording circle to the top right of the image.
+        May optionally include the key
+        "temp_range": tuple (min_C, max_C): Fixed temperature range mapped across the colormap.
+        When absent or None, each frame is autoscaled to its own min/max.
 
     """
     def __init__(self, temperature, telemetry, mask, t0, opts):
         self._data = copy(temperature)
         self._data, mask = self._resize(opts["scale"], self._data, mask)
-        self._data = self._normalize(self._data)
+        self._data = self._normalize(self._data, temp_range = opts.get("temp_range"))
         self._data = self._colorize(self._data, opts["cmap"])
         self._data = self._add_mask(self._data, mask)
         self._data = self._touint8(self._data)
@@ -407,15 +410,18 @@ class ViewerImage:
                 resized.append(None)
         return resized[0] if len(resized) == 1 else tuple(resized)
 
-    def _normalize(self, *args):
+    def _normalize(self, *args, temp_range = None):
         normed = []
         for arg in args:
             if np.all(np.isnan(arg)):
                 normed.append(arg)
                 continue
-            mn, mx = np.nanmin(arg), np.nanmax(arg)
-            if mn == mx:
-                mx = mn + 1
+            if temp_range is None:
+                mn, mx = np.nanmin(arg), np.nanmax(arg)
+                if mn == mx:
+                    mx = mn + 1
+            else:
+                mn, mx = temp_range
             normed.append((arg - mn) / (mx - mn))
         return normed[0] if len(normed) == 1 else tuple(normed)
 

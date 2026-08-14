@@ -53,6 +53,17 @@ def _parse_args():
         default = None,
     )
     parser.add_argument(
+        '-tr',
+        "--temp_range",
+        help = "Fixed color-scale temperature range in C as MIN MAX. Applies to the viewer "
+               "and recorded video only; raw TIFF snapshots and the stats CSV are unaffected. "
+               "Default is per-frame autoscale.",
+        type = float,
+        nargs = 2,
+        metavar = ("MIN", "MAX"),
+        default = None,
+    )
+    parser.add_argument(
         '-c',
         "--cmap",
         help = "Colormap used in viewer. Default is magma.",
@@ -73,6 +84,10 @@ def _parse_args():
         default = False,
     )
     args = parser.parse_args()
+    if args.temp_range is not None and not args.temp_range[0] < args.temp_range[1]:
+        parser.error(
+            f"temp_range MIN must be less than MAX, got {args.temp_range[0]} {args.temp_range[1]}"
+        )
     return args
 
 
@@ -103,6 +118,7 @@ def leprun(args = None):
         scale = args.viewer_scale,
         save_path = args.save_path,
         save_raw = args.save_raw,
+        temp_range = args.temp_range,
     )
 
 if __name__ == "__main__":
