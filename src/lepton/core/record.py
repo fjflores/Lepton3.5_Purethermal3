@@ -133,7 +133,7 @@ class FrameWriter:
             mask = np.zeros(lepton.RES, dtype=np.uint8)
         telem = json.dumps(data["telemetry"])
         msg = n.tobytes() + t.tobytes() + temp.tobytes() + mask.tobytes() + telem.encode("utf-8")
-        fname = f"fr{data["num"]:07d}.dat"
+        fname = f"fr{data['num']:07d}.dat"
         if not fname in self._archive_fnames:
             self._archive.writestr(fname, msg)
             self._archive_fnames.append(fname)
