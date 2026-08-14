@@ -124,8 +124,10 @@ class Stream:
         save_raw: float > 0
             When given, the true raw uint16 sensor frame (centikelvin, before denoising and
             homography) is saved as a 16-bit TIFF every save_raw minutes, starting with the
-            first valid frame. Snapshots are saved to a '<timestamp>_Thermal' directory inside
-            the save path. Works with or without recording. The default is None (no snapshots).
+            first valid frame. The frame's minimum, median, and maximum temperature are also
+            appended to a Temperature_Stats.csv file, one row per snapshot. Snapshots are
+            saved to a '<timestamp>_Thermal' directory inside the save path. Works with or
+            without recording. The default is None (no snapshots).
 
         Returns
         -------
@@ -215,7 +217,7 @@ class Stream:
             self._bufs['telemetry'].append(frame.telemetry)
 
             if opts["raw_writer"] is not None:
-                opts["raw_writer"].add(frame.raw_data, self._bufs['time'][-1])
+                opts["raw_writer"].add(frame.raw_data, frame.telemetry, self._bufs['time'][-1])
 
             if opts["detect"]:
                 i_range = range(max(-len(self._bufs['temperature']), -3), 0)
@@ -323,8 +325,10 @@ class Stream:
         save_raw: float > 0
             When given, the true raw uint16 sensor frame (centikelvin, before denoising and
             homography) is saved as a 16-bit TIFF every save_raw minutes, starting with the
-            first valid frame. Snapshots are saved to a '<timestamp>_Thermal' directory inside
-            the save path. Works with or without recording. The default is None (no snapshots).
+            first valid frame. The frame's minimum, median, and maximum temperature are also
+            appended to a Temperature_Stats.csv file, one row per snapshot. Snapshots are
+            saved to a '<timestamp>_Thermal' directory inside the save path. Works with or
+            without recording. The default is None (no snapshots).
 
         Returns
         -------

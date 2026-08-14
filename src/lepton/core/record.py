@@ -15,6 +15,7 @@ import zipfile
 import struct
 import os
 import json
+import csv
 from compression import gzip
 import cv2
 import numpy as np
@@ -169,7 +170,9 @@ class FrameWriter:
 class RawFrameWriter:
     """
     Periodically saves the true raw uint16 sensor frame (centikelvin, before denoising and
-    homography) as a 16-bit TIFF during camera stream.
+    homography) as a 16-bit TIFF during camera stream. Each snapshot also appends the frame's
+    minimum, median, and maximum temperature to a Temperature_Stats.csv file in the snapshot
+    directory.
 
     Parameters
     ----------
@@ -189,16 +192,20 @@ class RawFrameWriter:
         self._next_time = 0.0
         self._count = 0
 
-    def add(self, raw_data, time):
+    def add(self, raw_data, telemetry, time):
         """
         Saves a raw frame snapshot if the frame time has reached the next scheduled snapshot
-        time. The first valid frame is always saved.
+        time. The first valid frame is always saved. A row with the frame's minimum, median,
+        and maximum temperature is appended to Temperature_Stats.csv alongside each snapshot.
 
         Parameters
         ----------
         raw_data: ndarray
             The uint16 ndarray of raw frame data. The last 2 telemetry rows are excluded from
             the saved image.
+        telemetry: dict
+            The frame telemetry. Must include the keys "Minimum Temperature (C)",
+            "Median Temperature (C)", and "Maximum Temperature (C)".
         time: int
             The frame time in ms, offset from the first frame of the stream.
 
@@ -214,6 +221,19 @@ class RawFrameWriter:
         self._dirpath.mkdir(parents=True, exist_ok=True)
         fname = f"Lepton_Capture_{self._count:04d}.tiff"
         cv2.imwrite(str(self._dirpath / fname), raw_data[:-2])
+        stats_path = self._dirpath / "Temperature_Stats.csv"
+        new_file = not stats_path.exists()
+        with open(stats_path, "a", newline="") as f:
+            writer = csv.writer(f)
+            if new_file:
+                writer.writerow(["capture_index", "time_ms", "min_C", "median_C", "max_C"])
+            writer.writerow([
+                self._count,
+                time,
+                telemetry["Minimum Temperature (C)"],
+                telemetry["Median Temperature (C)"],
+                telemetry["Maximum Temperature (C)"],
+            ])
         self._count += 1
 
 def _render_frame(frame):

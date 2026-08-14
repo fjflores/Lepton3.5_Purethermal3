@@ -37,7 +37,7 @@ To periodically save the raw uint16 radiometric frame as a 16-bit TIFF, use the 
    (.venv) C:\Users\username> leprun -sr 5
 
 
-The first valid frame is saved immediately and then one frame every interval. Images are named *Lepton_Capture_<idx>.tiff* and saved to a *YYYY-MM-DD_HH-MM-SS_Thermal* directory inside the save path. Pixel values are the camera's native centikelvin counts, before dead-pixel repair and before any homography warp.
+The first valid frame is saved immediately and then one frame every interval. Images are named *Lepton_Capture_<idx>.tiff* and saved to a *YYYY-MM-DD_HH-MM-SS_Thermal* directory inside the save path. Pixel values are the camera's native centikelvin counts, before dead-pixel repair and before any homography warp. The frame's minimum, median, and maximum temperatures (°C) are also logged to *Temperature_Stats.csv* in the same directory, one row per snapshot.
 
 Help
 ----
