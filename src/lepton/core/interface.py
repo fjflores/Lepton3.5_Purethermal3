@@ -21,6 +21,8 @@ class Homography:
     ----------
     scale: float > 1
         The scale of the viewer window compared to the camera temperature data.
+    shape: tuple (width, height), optional
+        The shape of the temperature data displayed in the viewer. The default is lepton.SHAPE.
 
     Attributes
     ----------
@@ -33,33 +35,34 @@ class Homography:
         interest quadrilateral to a rectangle. The rectangle has user defined aspect ratio and
         is aligned with the axes of the viewer. Its first vertex is in the top left of the
         viewer and all other vertices follow CCW. When no valid roi is locked, has a value of
-        None. Scaled to be applied directly to temperature data (lepton.WIDTH, lepton.HEIGHT),
-        not to image data.
+        None. Scaled to be applied directly to temperature data (width, height), not to
+        image data.
 
     """
-    def __init__(self, scale):
+    def __init__(self, scale, shape = None):
         self._scale = scale
+        self._width, self._height = lepton.SHAPE if shape is None else shape
         self._value = None
         self._time_set = None
         self._src_verts = [None, None, None, None]
         self._dst_pts = None
 
     def _get_src_pts(self):
-        width_factor = (lepton.WIDTH - 1) / (self._scale * lepton.WIDTH - 1)
-        height_factor = (lepton.HEIGHT - 1) / (self._scale * lepton.HEIGHT - 1)
-        pts = [(min(max(v[0] * width_factor, 0), lepton.WIDTH - 1),
-                min(max(v[1] * height_factor, 0), lepton.HEIGHT - 1)) for v in self._src_verts]
+        width_factor = (self._width - 1) / (self._scale * self._width - 1)
+        height_factor = (self._height - 1) / (self._scale * self._height - 1)
+        pts = [(min(max(v[0] * width_factor, 0), self._width - 1),
+                min(max(v[1] * height_factor, 0), self._height - 1)) for v in self._src_verts]
         return np.array(pts, dtype=np.float32)
 
     def _get_dst_pts(self, dst_ar):
-        if lepton.WIDTH / dst_ar <= lepton.HEIGHT:
-            w_dst = lepton.WIDTH
+        if self._width / dst_ar <= self._height:
+            w_dst = self._width
             h_dst = w_dst / dst_ar
         else:
-            h_dst = lepton.HEIGHT
+            h_dst = self._height
             w_dst = dst_ar * h_dst
-        lft = 0.5 * (lepton.WIDTH - w_dst)
-        top = 0.5 * (lepton.HEIGHT - h_dst)
+        lft = 0.5 * (self._width - w_dst)
+        top = 0.5 * (self._height - h_dst)
         rgt = lft + w_dst - 1
         bot = top + h_dst - 1
         return np.array([(lft, top), (lft, bot), (rgt, bot), (rgt, top)], dtype=np.float32)
@@ -183,7 +186,9 @@ class Viewer:
         The name of the viewer window.
     scale: float > 1
         The scale of the viewer window. The exact size (width, height) in pixels is
-        (lepton.WIDTH*self.scale, lepton.HEIGHT*self.scale + lepton.TELEM_HEIGHT)
+        (self.shape[0]*self.scale, self.shape[1]*self.scale + lepton.TELEM_HEIGHT)
+    shape: tuple (width, height), optional
+        The shape of the temperature data displayed in the viewer. The default is lepton.SHAPE.
 
     Attributes
     ----------
@@ -193,15 +198,16 @@ class Viewer:
     """
     name: str
     scale: float
+    shape: tuple = lepton.SHAPE
 
     def __post_init__(self):
-        self._homography = Homography(self.scale)
+        self._homography = Homography(self.scale, self.shape)
         self._show_src = False
         self._nxt_src_vert = None
         self._dst_ar = [None, ] * 3
         shape = (
-            round(lepton.WIDTH*self.scale),
-            round(lepton.HEIGHT*self.scale + lepton.TELEM_HEIGHT)
+            round(self.shape[0]*self.scale),
+            round(self.shape[1]*self.scale + lepton.TELEM_HEIGHT)
         )
         cv2.namedWindow(self.name, cv2.WINDOW_AUTOSIZE)
         cv2.setMouseCallback(self.name, self._mouse_event)

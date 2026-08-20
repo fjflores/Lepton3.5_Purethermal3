@@ -20,6 +20,7 @@ from compression import gzip
 import cv2
 import numpy as np
 import lepton
+from .capture import rotate_frame
 from . import ViewerImage
 
 class FrameWriter:
@@ -36,6 +37,9 @@ class FrameWriter:
     temp_range : tuple (min_C, max_C), optional
         Fixed temperature range mapped across the colormap in the rendered video. When None,
         each frame is autoscaled to its own min/max. The default is None.
+    shape : tuple (width, height), optional
+        The shape of the recorded temperature frames. Differs from lepton.SHAPE when the
+        stream is rotated by 90 or 270 degrees. The default is lepton.SHAPE.
 
     Attributes
     ----------
@@ -43,7 +47,7 @@ class FrameWriter:
         The coordinates of the corners of the ROI defined in viewer window coordinates.
 
     """
-    def __init__(self, dirpath, cmap, temp_range = None):
+    def __init__(self, dirpath, cmap, temp_range = None, shape = None):
         parentpath = Path(dirpath)
         parentpath.mkdir(parents=True, exist_ok=True)
         fname = Path(datetime.now().strftime("%Y-%m-%d_%H%M%S"))
@@ -51,6 +55,7 @@ class FrameWriter:
         self._archive = None
         self._cmap = cmap
         self._temp_range = temp_range
+        self._shape = lepton.SHAPE if shape is None else tuple(shape)
         self._archive_fnames = deque([])
 
     def __enter__(self):
@@ -74,11 +79,11 @@ class FrameWriter:
                 fmt_str = "II" + "H"*lepton.RES + "B"*lepton.RES + "B"*(len(dat)-(3*lepton.RES+8))
                 dat = struct.unpack(fmt_str, dat)
                 temp = dat[2:(lepton.RES + 2)]
-                temp = np.array(temp).reshape(lepton.SHAPE[::-1]) * .01 - 273.15
+                temp = np.array(temp).reshape(self._shape[::-1]) * .01 - 273.15
                 temp[temp > 250.0] = float('nan')
                 temp[temp < -50.0] = float('nan')
                 mask = dat[(lepton.RES + 2):(2*lepton.RES + 2)]
-                mask = np.array(mask, dtype=bool).reshape(lepton.SHAPE[::-1])
+                mask = np.array(mask, dtype=bool).reshape(self._shape[::-1])
                 telem = dat[(2*lepton.RES + 2):]
                 telem = json.loads(bytes(telem).decode("utf-8"))
                 frames["frame_number"].append(dat[0])
@@ -175,7 +180,7 @@ class FrameWriter:
 class RawFrameWriter:
     """
     Periodically saves the true raw uint16 sensor frame (centikelvin, before denoising and
-    homography) as a 16-bit TIFF during camera stream. Each snapshot also appends the frame's
+    homography, but rotated to match the stream) as a 16-bit TIFF during camera stream. Each snapshot also appends the frame's
     minimum, median, and maximum temperature to a Temperature_Stats.csv file in the snapshot
     directory.
 
@@ -185,11 +190,15 @@ class RawFrameWriter:
         The path to the directory in which the snapshot directory is made.
     interval : float > 0
         The time between saved snapshots in minutes.
+    rotation : int, optional
+        The clockwise rotation in degrees applied to the saved snapshot so it matches the
+        rotated stream. Must be one of 0, 90, 180, or 270. The default is 0.
 
     """
-    def __init__(self, dirpath, interval):
+    def __init__(self, dirpath, interval, rotation = 0):
         if not interval > 0.0:
             raise ValueError(f"interval must be a positive number of minutes, got {interval}")
+        self._rotation = rotation
         parentpath = Path(dirpath)
         fname = Path(datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_Thermal")
         self._dirpath = parentpath / fname
@@ -225,7 +234,7 @@ class RawFrameWriter:
             self._next_time += self._interval
         self._dirpath.mkdir(parents=True, exist_ok=True)
         fname = f"Lepton_Capture_{self._count:04d}.tiff"
-        cv2.imwrite(str(self._dirpath / fname), raw_data[:-2])
+        cv2.imwrite(str(self._dirpath / fname), rotate_frame(raw_data[:-2], self._rotation))
         stats_path = self._dirpath / "Temperature_Stats.csv"
         new_file = not stats_path.exists()
         with open(stats_path, "a", newline="") as f:

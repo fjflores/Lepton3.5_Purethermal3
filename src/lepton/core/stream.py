@@ -12,6 +12,7 @@ from collections import deque
 from dataclasses import dataclass
 import traceback
 import sys
+import lepton
 from lepton.misc import colormaps, detect_fp_fronts
 from lepton.exceptions import CaptureException, CaptureTimeout, ShapeException, UnknownCmapException
 from . import Capture, Viewer, ViewerImage, FrameWriter, RawFrameWriter
@@ -133,6 +134,10 @@ class Stream:
             across the colormap instead of autoscaling each frame to its own min/max. Only
             affects visualization; recorded temperature data and raw snapshots are unchanged.
             The default is None (autoscale).
+        rotation: int
+            Clockwise rotation in degrees applied to the camera image. Must be a multiple of
+            90 (negative values allowed). Applies everywhere: the viewer, the recorded
+            temperature/mask arrays and video, and raw TIFF snapshots. The default is 0.
 
         Returns
         -------
@@ -195,8 +200,8 @@ class Stream:
         time.sleep(0.05)
         return None
 
-    def _record_loop(self, dirpath, cmap, temp_range):
-        with FrameWriter(dirpath, cmap, temp_range) as writer:
+    def _record_loop(self, dirpath, cmap, temp_range, shape):
+        with FrameWriter(dirpath, cmap, temp_range, shape) as writer:
             while not self._done() or not self._bufs_empty():
                 data = self._bufs_popleft(1 if self._done() else 8)
                 writer.add(data)
@@ -276,7 +281,13 @@ class Stream:
                 "dirpath": kwargs.get("save_path", "Lepton_Recordings"),
                 "save_raw": kwargs.get("save_raw", None),
                 "temp_range": kwargs.get("temp_range", None),
+                "rotation": int(kwargs.get("rotation", 0)) % 360,
             }
+            if opts["rotation"] not in (0, 90, 180, 270):
+                raise ValueError(
+                    f"rotation must be a multiple of 90 degrees, got {kwargs.get('rotation')}"
+                )
+            frame_shape = lepton.SHAPE if opts["rotation"] % 180 == 0 else lepton.SHAPE[::-1]
             if opts["temp_range"] is not None:
                 opts["temp_range"] = (float(opts["temp_range"][0]), float(opts["temp_range"][1]))
                 if not opts["temp_range"][0] < opts["temp_range"][1]:
@@ -284,19 +295,21 @@ class Stream:
                         f"temp_range min must be less than max, got {opts['temp_range']}"
                     )
             if opts["save_raw"] is not None:
-                opts["raw_writer"] = RawFrameWriter(opts["dirpath"], opts["save_raw"])
+                opts["raw_writer"] = RawFrameWriter(
+                    opts["dirpath"], opts["save_raw"], opts["rotation"]
+                )
             else:
                 opts["raw_writer"] = None
             with(
-                Capture(self._params["dev_idx"]) as cap,
-                Viewer(self._params["window"], opts["scale"]) as viewer,
+                Capture(self._params["dev_idx"], opts["rotation"]) as cap,
+                Viewer(self._params["window"], opts["scale"], frame_shape) as viewer,
             ):
                 with self._lock:
                     self._flags["streaming"] = True
                 if opts["record"]:
                     _record_thread = Thread(
                         target=self._record_loop,
-                        args=(opts["dirpath"], opts["cmap"], opts["temp_range"], )
+                        args=(opts["dirpath"], opts["cmap"], opts["temp_range"], frame_shape, )
                     )
                     _record_thread.start()
                 self._stream_loop(cap, viewer, opts)
@@ -346,6 +359,10 @@ class Stream:
             across the colormap instead of autoscaling each frame to its own min/max. Only
             affects visualization; recorded temperature data and raw snapshots are unchanged.
             The default is None (autoscale).
+        rotation: int
+            Clockwise rotation in degrees applied to the camera image. Must be a multiple of
+            90 (negative values allowed). Applies everywhere: the viewer, the recorded
+            temperature/mask arrays and video, and raw TIFF snapshots. The default is 0.
 
         Returns
         -------

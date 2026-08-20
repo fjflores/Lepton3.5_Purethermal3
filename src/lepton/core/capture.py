@@ -16,6 +16,45 @@ from skimage import filters
 import lepton
 from lepton.exceptions import CaptureException, ShapeException, CaptureTimeout
 
+_ROTATE_CODES = {
+    0: None,
+    90: cv2.ROTATE_90_CLOCKWISE,
+    180: cv2.ROTATE_180,
+    270: cv2.ROTATE_90_COUNTERCLOCKWISE,
+}
+
+def rotate_frame(arr, rotation):
+    """
+    Rotates a frame clockwise in 90 degree steps.
+
+    Parameters
+    ----------
+    arr: ndarray
+        The frame data to rotate.
+    rotation: int
+        The clockwise rotation in degrees. Must be one of 0, 90, 180, or 270.
+
+    Returns
+    -------
+    rotated: ndarray
+        The rotated frame data.
+
+    Raises
+    ------
+    ValueError
+        Raised when rotation is not one of 0, 90, 180, or 270.
+
+    """
+    try:
+        code = _ROTATE_CODES[rotation]
+    except KeyError:
+        raise ValueError(
+            f"rotation must be one of {sorted(_ROTATE_CODES)}, got {rotation}"
+        ) from None
+    if code is None:
+        return arr
+    return cv2.rotate(arr, code)
+
 @dataclass
 class CapFrame:
     """
@@ -30,6 +69,9 @@ class CapFrame:
     homography: ndarray, optional
         A float ndarray that defines a homography transform to apply to the captured temperature
         data after decoding. When None, no homography is applied. The default is None.
+    rotation: int, optional
+        The clockwise rotation in degrees applied to the temperature data after denoising and
+        before the homography. Must be one of 0, 90, 180, or 270. The default is 0.
 
     Attributes
     ----------
@@ -42,6 +84,7 @@ class CapFrame:
     raw_data: np.ndarray
     frame_times: deque
     homography: tuple(np.ndarray, np.ndarray) = (None, None)
+    rotation: int = 0
     temperature: np.ndarray = field(default_factory = lambda: np.ndarray(0))
     telemetry: dict = field(default_factory = dict)
 
@@ -62,17 +105,19 @@ class CapFrame:
     def _get_temperature(self):
         temperature = self.raw_data[:-2].astype(np.float32) * 0.01 - 273.15
         self.temperature = self._denoise(temperature)
+        self.temperature = rotate_frame(self.temperature, self.rotation)
         if not any(h is None for h in self.homography):
+            shape = self.temperature.shape[::-1]
             self.temperature = cv2.warpPerspective(
                 self.temperature,
                 self.homography[0],
-                lepton.SHAPE,
+                shape,
                 flags=cv2.INTER_CUBIC,
                 borderMode=cv2.BORDER_REFLECT)
             mask = cv2.warpPerspective(
-                np.ones(lepton.SHAPE[::-1]),
+                np.ones(shape[::-1]),
                 self.homography[0],
-                lepton.SHAPE,
+                shape,
                 flags=cv2.INTER_NEAREST,
                 borderMode=cv2.BORDER_CONSTANT,
                 borderValue=0
@@ -223,10 +268,18 @@ class Capture():
     ----------
     dev_idx : int
         Integer that specifies which camera device is the Lepton.
+    rotation : int, optional
+        The clockwise rotation in degrees applied to the captured temperature data. Must be one
+        of 0, 90, 180, or 270. The default is 0.
 
     """
-    def __init__(self, dev_idx):
+    def __init__(self, dev_idx, rotation = 0):
+        if rotation not in _ROTATE_CODES:
+            raise ValueError(
+                f"rotation must be one of {sorted(_ROTATE_CODES)}, got {rotation}"
+            )
         self._dev_idx = dev_idx
+        self._rotation = rotation
         self._prev_time = deque([float('nan'), ] * 10)
         self._cap = self._aquire()
 
@@ -275,7 +328,12 @@ class Capture():
         """
         # If the frame is captured during camera boot or FFC frame, ignore it and try again
         for _ in range(4):
-            frame = CapFrame(self._get_frame_data(), self._prev_time, homography = homography)
+            frame = CapFrame(
+                self._get_frame_data(),
+                self._prev_time,
+                homography = homography,
+                rotation = self._rotation,
+            )
             if (not frame.telemetry["FFC state"] == "never commanded" and
                 not frame.telemetry["FFC state"] == "in progress"):
                 self._prev_time.append(time.monotonic_ns())

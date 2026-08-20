@@ -64,6 +64,15 @@ def _parse_args():
         default = None,
     )
     parser.add_argument(
+        '-rot',
+        "--rotate",
+        help = "Clockwise rotation of the camera image in degrees. Applies to the viewer, "
+               "recorded data and video, and raw TIFF snapshots. Default is 0.",
+        type = int,
+        choices = [0, 90, 180, 270],
+        default = 0,
+    )
+    parser.add_argument(
         '-c',
         "--cmap",
         help = "Colormap used in viewer. Default is magma.",
@@ -119,6 +128,7 @@ def leprun(args = None):
         save_path = args.save_path,
         save_raw = args.save_raw,
         temp_range = args.temp_range,
+        rotation = args.rotate,
     )
 
 if __name__ == "__main__":
